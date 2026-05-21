@@ -145,6 +145,39 @@ button:hover,
   font-size: 26px;
 }
 
+.clickable-card {
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.clickable-card:hover,
+.clickable-card:focus {
+  border-color: var(--brand);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.chart-panel {
+  margin-bottom: 18px;
+}
+
+.chart-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.chart-controls select {
+  min-width: 120px;
+}
+
+#exchangeChart {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
 .entry-layout {
   margin-bottom: 18px;
 }
@@ -317,6 +350,10 @@ td span {
 
   .panel-head {
     align-items: stretch;
+    flex-direction: column;
+  }
+
+  .chart-controls {
     flex-direction: column;
   }
 

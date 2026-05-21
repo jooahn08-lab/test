@@ -25,7 +25,14 @@ const closedSearch = document.querySelector("#closedSearch");
 const holdingEmptyTemplate = document.querySelector("#holdingEmptyTemplate");
 const closedEmptyTemplate = document.querySelector("#closedEmptyTemplate");
 const exchangeRateBadge = document.querySelector("#exchangeRateBadge");
+const currentExchangeRate = document.querySelector("#currentExchangeRate");
 const refreshRateBtn = document.querySelector("#refreshRateBtn");
+const exchangeRateCard = document.querySelector("#exchangeRateCard");
+const exchangeChartPanel = document.querySelector("#exchangeChartPanel");
+const exchangePeriod = document.querySelector("#exchangePeriod");
+const loadExchangeChartBtn = document.querySelector("#loadExchangeChartBtn");
+const exchangeChartStatus = document.querySelector("#exchangeChartStatus");
+const exchangeChart = document.querySelector("#exchangeChart");
 const samsungEndpoint = document.querySelector("#samsungEndpoint");
 const samsungToken = document.querySelector("#samsungToken");
 const syncSamsungBtn = document.querySelector("#syncSamsungBtn");
@@ -108,6 +115,12 @@ function formatNumber(value) {
   });
 }
 
+function formatRate(value) {
+  return toNumber(value).toLocaleString("ko-KR", {
+    maximumFractionDigits: 4
+  });
+}
+
 function formatPercent(value) {
   return `${toNumber(value).toFixed(2)}%`;
 }
@@ -154,7 +167,7 @@ async function fetchUsdKrwRate() {
     updateExchangeRateControls();
     recalculateTrades();
   } catch (error) {
-    exchangeRateBadge.textContent = `USD/KRW ${formatNumber(usdKrwRate)}${usdKrwDate ? ` (${usdKrwDate})` : ""}`;
+    updateExchangeRateControls();
     syncStatus.textContent = "환율을 새로 가져오지 못했습니다. 마지막 저장 환율로 계산합니다.";
   } finally {
     refreshRateBtn.disabled = false;
@@ -162,7 +175,9 @@ async function fetchUsdKrwRate() {
 }
 
 function updateExchangeRateControls() {
-  exchangeRateBadge.textContent = `USD/KRW ${formatNumber(usdKrwRate)}${usdKrwDate ? ` (${usdKrwDate})` : ""}`;
+  const label = `USD/KRW ${formatRate(usdKrwRate)}${usdKrwDate ? ` (${usdKrwDate})` : ""}`;
+  exchangeRateBadge.textContent = label;
+  currentExchangeRate.textContent = formatRate(usdKrwRate);
   form.elements["Exchange Rate"].value = String(usdKrwRate || 1);
 }
 
@@ -210,7 +225,7 @@ function renderTable({ rowsElement, emptyTemplate, data, closed }) {
   data.forEach(({ trade, index }) => {
     const profit = toNumber(trade["Net Profit"]);
     const tr = document.createElement("tr");
-    const commonCells = `
+    tr.innerHTML = `
       <td>${escapeHtml(trade["Buy Date"])}</td>
       ${closed ? `<td>${escapeHtml(trade["Sell Date"])}</td>` : ""}
       <td><strong>${escapeHtml(trade.Ticker)}</strong><br><span>${escapeHtml(trade.Side)}</span></td>
@@ -225,21 +240,18 @@ function renderTable({ rowsElement, emptyTemplate, data, closed }) {
         <button type="button" class="ghost" data-delete="${index}">삭제</button>
       </td>
     `;
-    tr.innerHTML = commonCells;
     rowsElement.append(tr);
   });
 }
 
 function renderSummary() {
   const holdings = trades.filter((trade) => !isClosed(trade));
-  const closed = trades.filter(isClosed);
   const totalNetProfit = trades.reduce((sum, trade) => sum + toNumber(trade["Net Profit"]), 0);
   const averageReturn = trades.length
     ? trades.reduce((sum, trade) => sum + toNumber(trade["Return %"]), 0) / trades.length
     : 0;
 
   document.querySelector("#holdingCount").textContent = holdings.length;
-  document.querySelector("#closedCount").textContent = closed.length;
   document.querySelector("#totalNetProfit").textContent = formatNumber(totalNetProfit);
   document.querySelector("#averageReturn").textContent = formatPercent(averageReturn);
 }
@@ -248,7 +260,7 @@ function resetForm() {
   form.reset();
   editIndex.value = "";
   form.elements["Buy Date"].valueAsDate = new Date();
-  form.elements["Fee"].value = "0";
+  form.elements.Fee.value = "0";
   form.elements["Exchange Rate"].value = String(usdKrwRate || 1);
 }
 
@@ -270,6 +282,187 @@ function serializeForm() {
   });
   data["Exchange Rate"] = String(getExchangeRateForMarket(data.Market, usdKrwRate));
   return calculateTrade(data);
+}
+
+function getRangeStart(period) {
+  const date = new Date();
+  if (period === "daily") {
+    date.setDate(date.getDate() - 90);
+  } else if (period === "monthly") {
+    date.setFullYear(date.getFullYear() - 3);
+  } else {
+    date.setFullYear(date.getFullYear() - 10);
+  }
+  return date.toISOString().slice(0, 10);
+}
+
+function aggregateRates(points, period) {
+  if (period === "daily") {
+    return points;
+  }
+
+  const groups = new Map();
+  points.forEach((point) => {
+    const key = period === "monthly" ? point.date.slice(0, 7) : point.date.slice(0, 4);
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key).push(point.rate);
+  });
+
+  return Array.from(groups, ([date, rates]) => ({
+    date,
+    rate: rates.reduce((sum, rate) => sum + rate, 0) / rates.length
+  }));
+}
+
+function normalizeRateSeries(payload, period) {
+  if (Array.isArray(payload.data)) {
+    return aggregateRates(payload.data.map((item) => ({
+      date: item.date,
+      rate: toNumber(item.rates?.KRW || item.rate)
+    })).filter((item) => item.date && item.rate), period);
+  }
+
+  if (payload.rates && typeof payload.rates === "object") {
+    return aggregateRates(Object.entries(payload.rates).map(([date, rates]) => ({
+      date,
+      rate: toNumber(rates.KRW || rates.krw || rates)
+    })).filter((item) => item.rate), period);
+  }
+
+  return [];
+}
+
+async function loadExchangeChart() {
+  const period = exchangePeriod.value;
+  const from = getRangeStart(period);
+  exchangeChartStatus.textContent = "환율 데이터를 불러오는 중입니다.";
+  loadExchangeChartBtn.disabled = true;
+
+  try {
+    const url = `https://api.frankfurter.dev/v2/rates?from=${from}&base=USD&quotes=KRW`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error("과거 환율 API 응답 오류");
+    }
+
+    const points = normalizeRateSeries(await response.json(), period);
+    if (!points.length) {
+      throw new Error("표시할 환율 데이터가 없습니다.");
+    }
+
+    drawExchangeChart(points, period);
+    exchangeChartStatus.textContent = `${points[0].date}부터 ${points[points.length - 1].date}까지 ${periodLabel(period)} 환율입니다.`;
+  } catch (error) {
+    exchangeChartStatus.textContent = `조회 실패: ${error.message}`;
+    clearChart("환율 데이터를 표시할 수 없습니다.");
+  } finally {
+    loadExchangeChartBtn.disabled = false;
+  }
+}
+
+function periodLabel(period) {
+  if (period === "daily") {
+    return "일별";
+  }
+  if (period === "monthly") {
+    return "월별 평균";
+  }
+  return "년도별 평균";
+}
+
+function drawExchangeChart(points, period) {
+  const canvas = exchangeChart;
+  const ctx = canvas.getContext("2d");
+  const width = canvas.width;
+  const height = canvas.height;
+  const padding = { top: 24, right: 28, bottom: 54, left: 70 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+  const rates = points.map((point) => point.rate);
+  const min = Math.min(...rates);
+  const max = Math.max(...rates);
+  const range = max - min || 1;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = "#dce2dd";
+  ctx.lineWidth = 1;
+  ctx.fillStyle = "#68746f";
+  ctx.font = "13px Arial";
+
+  for (let i = 0; i <= 4; i += 1) {
+    const y = padding.top + (chartHeight / 4) * i;
+    const rate = max - (range / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(width - padding.right, y);
+    ctx.stroke();
+    ctx.fillText(formatRate(rate), 10, y + 4);
+  }
+
+  ctx.strokeStyle = "#176b63";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  points.forEach((point, index) => {
+    const x = padding.left + (points.length === 1 ? 0 : (chartWidth / (points.length - 1)) * index);
+    const y = padding.top + chartHeight - ((point.rate - min) / range) * chartHeight;
+    if (index === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  });
+  ctx.stroke();
+
+  ctx.fillStyle = "#176b63";
+  points.forEach((point, index) => {
+    const shouldDraw = points.length <= 24 || index % Math.ceil(points.length / 24) === 0 || index === points.length - 1;
+    if (!shouldDraw) {
+      return;
+    }
+    const x = padding.left + (points.length === 1 ? 0 : (chartWidth / (points.length - 1)) * index);
+    const y = padding.top + chartHeight - ((point.rate - min) / range) * chartHeight;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.fillStyle = "#1d2522";
+  ctx.font = "12px Arial";
+  const labelCount = period === "daily" ? 6 : Math.min(points.length, 8);
+  for (let i = 0; i < labelCount; i += 1) {
+    const index = labelCount === 1 ? 0 : Math.round((points.length - 1) * (i / (labelCount - 1)));
+    const x = padding.left + (points.length === 1 ? 0 : (chartWidth / (points.length - 1)) * index);
+    const label = points[index].date;
+    ctx.save();
+    ctx.translate(x - 20, height - 22);
+    ctx.rotate(-0.35);
+    ctx.fillText(label, 0, 0);
+    ctx.restore();
+  }
+}
+
+function clearChart(message) {
+  const ctx = exchangeChart.getContext("2d");
+  ctx.clearRect(0, 0, exchangeChart.width, exchangeChart.height);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, exchangeChart.width, exchangeChart.height);
+  ctx.fillStyle = "#68746f";
+  ctx.font = "16px Arial";
+  ctx.fillText(message, 32, 52);
+}
+
+function toggleExchangeChart() {
+  const willOpen = exchangeChartPanel.hidden;
+  exchangeChartPanel.hidden = !willOpen;
+  exchangeRateCard.setAttribute("aria-expanded", String(willOpen));
+  if (willOpen) {
+    loadExchangeChart();
+  }
 }
 
 function normalizeSamsungHolding(holding) {
@@ -443,6 +636,17 @@ holdingRows.addEventListener("click", handleTableAction);
 closedRows.addEventListener("click", handleTableAction);
 holdingSearch.addEventListener("input", render);
 closedSearch.addEventListener("input", render);
+refreshRateBtn.addEventListener("click", fetchUsdKrwRate);
+loadExchangeChartBtn.addEventListener("click", loadExchangeChart);
+exchangePeriod.addEventListener("change", loadExchangeChart);
+exchangeRateCard.addEventListener("click", toggleExchangeChart);
+exchangeRateCard.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    toggleExchangeChart();
+  }
+});
+syncSamsungBtn.addEventListener("click", syncSamsungAccount);
 
 document.querySelector("#csvInput").addEventListener("change", async (event) => {
   const file = event.target.files[0];
@@ -466,8 +670,6 @@ document.querySelector("#clearBtn").addEventListener("click", () => {
   }
 });
 document.querySelector("#resetFormBtn").addEventListener("click", resetForm);
-refreshRateBtn.addEventListener("click", fetchUsdKrwRate);
-syncSamsungBtn.addEventListener("click", syncSamsungAccount);
 
 updateExchangeRateControls();
 resetForm();

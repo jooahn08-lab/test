@@ -30,9 +30,9 @@
           <span>보유 종목</span>
           <strong id="holdingCount">0</strong>
         </article>
-        <article>
-          <span>완료 거래</span>
-          <strong id="closedCount">0</strong>
+        <article id="exchangeRateCard" class="clickable-card" tabindex="0" role="button" aria-controls="exchangeChartPanel" aria-expanded="false">
+          <span>현재 환율</span>
+          <strong id="currentExchangeRate">0</strong>
         </article>
         <article>
           <span>평가/실현 순수익</span>
@@ -42,6 +42,24 @@
           <span>평균 수익률</span>
           <strong id="averageReturn">0%</strong>
         </article>
+      </section>
+
+      <section id="exchangeChartPanel" class="panel chart-panel" hidden>
+        <div class="panel-head">
+          <div>
+            <h2>USD/KRW 환율 그래프</h2>
+            <p id="exchangeChartStatus" class="form-note">일별, 월별, 년도별 과거 환율을 조회합니다.</p>
+          </div>
+          <div class="chart-controls">
+            <select id="exchangePeriod" aria-label="환율 조회 단위">
+              <option value="daily">일별</option>
+              <option value="monthly">월별</option>
+              <option value="yearly">년도별</option>
+            </select>
+            <button id="loadExchangeChartBtn" type="button">조회</button>
+          </div>
+        </div>
+        <canvas id="exchangeChart" width="1200" height="420" aria-label="USD/KRW 환율 그래프"></canvas>
       </section>
 
       <section class="entry-layout">
