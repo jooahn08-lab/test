@@ -1,61 +1,32 @@
-# Stock Trading Journal
+# 주식 매매일지
 
-Use this journal to record every trade with the same structure. Open `stock_trading_journal.csv` in Excel, Google Sheets, or Numbers.
+`index.html`을 브라우저에서 열어 매매일지를 관리합니다. 데이터는 브라우저에 자동 저장되며, `CSV 내보내기`로 시트 파일을 갱신할 수 있습니다.
 
-## Website
+## 구성
 
-Open `index.html` in a browser to manage the journal from a local homepage.
+- 왼쪽/첫 번째 표: 현재 보유 중인 주식
+- 오른쪽/두 번째 표: 매매 완료한 주식
+- 판매날짜와 판매가격이 있으면 매매 완료로 분류됩니다.
+- 판매날짜와 판매가격이 비어 있으면 현재 보유 중으로 분류됩니다.
 
-- `CSV 가져오기`: Load `stock_trading_journal.csv` or another CSV using the same columns.
-- `CSV 내보내기`: Download the current journal as `stock_trading_journal.csv`.
-- Browser edits are saved in local storage, so exporting CSV is the way to update the sheet file.
+## 입력 항목
 
-## Daily Checklist
+- `Buy Date`: 구매날짜
+- `Ticker`: 종목
+- `Market`: 시장
+- `Side`: 구분
+- `Buy Price`: 매매단가
+- `Quantity`: 수량
+- `Fee`: 수수료
+- `Exchange Rate`: 환율
+- `Current Price`: 현재가
+- `Sell Date`: 판매날짜
+- `Sell Price`: 판매가격
+- `Net Profit`: 최종 순수익
+- `Return %`: 매매 당시 주가 대비 수익률
 
-- Market condition:
-- Watchlist:
-- Planned setups:
-- Maximum daily loss:
-- Notes before trading:
+## 계산 방식
 
-## Trade Review Questions
-
-- Did I follow my plan?
-- Was the entry based on a clear setup?
-- Was the position size appropriate?
-- Did I respect the stop loss?
-- What should I repeat next time?
-- What should I avoid next time?
-
-## Weekly Review
-
-- Total trades:
-- Win rate:
-- Total realized P/L:
-- Best trade:
-- Worst trade:
-- Most common mistake:
-- One rule for next week:
-
-## Column Guide
-
-- `Date`: Trade date.
-- `Ticker`: Stock symbol.
-- `Market`: US, Korea, Japan, etc.
-- `Side`: Buy, Sell, Short, Cover.
-- `Strategy`: Breakout, pullback, trend following, earnings, dividend, etc.
-- `Entry Price`: Average entry price.
-- `Exit Price`: Average exit price.
-- `Shares`: Number of shares.
-- `Fees`: Commission, tax, slippage, or other costs.
-- `Realized P/L`: Profit or loss after fees.
-- `Return %`: Percentage return on the trade.
-- `Risk Amount`: Planned loss if stop loss is hit.
-- `Stop Loss`: Price where the trade idea is invalidated.
-- `Target Price`: Planned profit-taking level.
-- `R Multiple`: Realized P/L divided by risk amount.
-- `Reason For Entry`: Why you entered.
-- `Reason For Exit`: Why you exited.
-- `Emotion`: Calm, rushed, fearful, greedy, patient, etc.
-- `Lesson`: One sentence you can use next time.
-- `Screenshot/Link`: Chart image path or broker screenshot link.
+- 보유 중: `(현재가 - 매매단가) * 수량 * 환율 - 수수료`
+- 매매 완료: `(판매가격 - 매매단가) * 수량 * 환율 - 수수료`
+- 수익률: `최종 순수익 / (매매단가 * 수량 * 환율) * 100`

@@ -25,88 +25,116 @@
     <main class="layout">
       <section class="summary-grid" aria-label="요약">
         <article>
-          <span>총 거래</span>
-          <strong id="totalTrades">0</strong>
+          <span>보유 종목</span>
+          <strong id="holdingCount">0</strong>
         </article>
         <article>
-          <span>총 손익</span>
-          <strong id="totalPnl">0</strong>
+          <span>완료 거래</span>
+          <strong id="closedCount">0</strong>
         </article>
         <article>
-          <span>승률</span>
-          <strong id="winRate">0%</strong>
+          <span>평가/실현 순수익</span>
+          <strong id="totalNetProfit">0</strong>
         </article>
         <article>
-          <span>평균 R</span>
-          <strong id="avgR">0.00</strong>
+          <span>평균 수익률</span>
+          <strong id="averageReturn">0%</strong>
         </article>
       </section>
 
-      <section class="workbench">
+      <section class="entry-layout">
         <form id="tradeForm" class="panel">
           <div class="panel-head">
-            <h2>거래 입력</h2>
+            <h2>매매 입력</h2>
             <button id="resetFormBtn" type="button" class="ghost">새 입력</button>
           </div>
           <input id="editIndex" type="hidden">
           <div class="form-grid">
-            <label>날짜<input name="Date" type="date" required></label>
+            <label>구매날짜<input name="Buy Date" type="date" required></label>
             <label>종목<input name="Ticker" type="text" placeholder="AAPL, 005930" required></label>
             <label>시장<input name="Market" type="text" placeholder="US, KR"></label>
             <label>구분
               <select name="Side">
-                <option>Buy</option>
-                <option>Sell</option>
-                <option>Short</option>
-                <option>Cover</option>
+                <option>매수</option>
+                <option>매도</option>
               </select>
             </label>
-            <label>전략<input name="Strategy" type="text" placeholder="Breakout"></label>
-            <label>진입가<input name="Entry Price" type="number" step="0.01"></label>
-            <label>청산가<input name="Exit Price" type="number" step="0.01"></label>
-            <label>수량<input name="Shares" type="number" step="1"></label>
-            <label>수수료<input name="Fees" type="number" step="0.01"></label>
-            <label>리스크 금액<input name="Risk Amount" type="number" step="0.01"></label>
-            <label>손절가<input name="Stop Loss" type="number" step="0.01"></label>
-            <label>목표가<input name="Target Price" type="number" step="0.01"></label>
-            <label>감정<input name="Emotion" type="text" placeholder="Calm, Fearful"></label>
-            <label>스크린샷/링크<input name="Screenshot/Link" type="url" placeholder="https://"></label>
+            <label>매매단가<input name="Buy Price" type="number" step="0.01" required></label>
+            <label>수량<input name="Quantity" type="number" step="1" min="0" required></label>
+            <label>수수료<input name="Fee" type="number" step="0.01" min="0" value="0"></label>
+            <label>환율<input name="Exchange Rate" type="number" step="0.0001" min="0" value="1"></label>
+            <label>현재가<input name="Current Price" type="number" step="0.01" min="0"></label>
+            <label>판매날짜<input name="Sell Date" type="date"></label>
+            <label>판매가격<input name="Sell Price" type="number" step="0.01" min="0"></label>
           </div>
-          <label>진입 이유<textarea name="Reason For Entry" rows="3"></textarea></label>
-          <label>청산 이유<textarea name="Reason For Exit" rows="3"></textarea></label>
-          <label>교훈<textarea name="Lesson" rows="3"></textarea></label>
+          <p class="form-note">판매날짜와 판매가격을 입력하면 매매 완료로, 비워두면 보유 중으로 표시됩니다.</p>
           <button type="submit" class="primary">저장</button>
         </form>
+      </section>
 
+      <section class="board-grid">
         <section class="panel table-panel">
           <div class="panel-head">
-            <h2>거래 목록</h2>
-            <input id="searchInput" type="search" placeholder="종목, 전략, 감정 검색">
+            <h2>현재 보유 중인 주식</h2>
+            <input id="holdingSearch" type="search" placeholder="보유 종목 검색">
           </div>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>날짜</th>
+                  <th>구매날짜</th>
                   <th>종목</th>
-                  <th>구분</th>
-                  <th>전략</th>
-                  <th>손익</th>
+                  <th>시장</th>
+                  <th>구매가</th>
+                  <th>현재가</th>
+                  <th>수량</th>
+                  <th>순수익</th>
                   <th>수익률</th>
-                  <th>R</th>
                   <th>관리</th>
                 </tr>
               </thead>
-              <tbody id="tradeRows"></tbody>
+              <tbody id="holdingRows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel table-panel">
+          <div class="panel-head">
+            <h2>매매 완료한 주식</h2>
+            <input id="closedSearch" type="search" placeholder="완료 종목 검색">
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>구매날짜</th>
+                  <th>판매날짜</th>
+                  <th>종목</th>
+                  <th>시장</th>
+                  <th>구매가</th>
+                  <th>판매가</th>
+                  <th>수량</th>
+                  <th>순수익</th>
+                  <th>수익률</th>
+                  <th>관리</th>
+                </tr>
+              </thead>
+              <tbody id="closedRows"></tbody>
             </table>
           </div>
         </section>
       </section>
     </main>
 
-    <template id="emptyTemplate">
+    <template id="holdingEmptyTemplate">
       <tr>
-        <td colspan="8" class="empty">CSV를 가져오거나 첫 거래를 입력하세요.</td>
+        <td colspan="9" class="empty">현재 보유 중인 주식이 없습니다.</td>
+      </tr>
+    </template>
+
+    <template id="closedEmptyTemplate">
+      <tr>
+        <td colspan="10" class="empty">매매 완료한 주식이 없습니다.</td>
       </tr>
     </template>
 
