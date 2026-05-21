@@ -17,7 +17,9 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  background:
+    linear-gradient(rgba(246, 247, 244, 0.86), rgba(246, 247, 244, 0.9)),
+    url("photo/download.jpg") center / cover fixed;
   color: var(--ink);
   font-family: Arial, "Malgun Gothic", sans-serif;
 }
@@ -36,7 +38,8 @@ textarea {
   gap: 24px;
   padding: 28px 32px;
   border-bottom: 1px solid var(--line);
-  background: #fff;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
 }
 
 .eyebrow {
