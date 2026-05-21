@@ -36,11 +36,16 @@ const exchangeChart = document.querySelector("#exchangeChart");
 const samsungEndpoint = document.querySelector("#samsungEndpoint");
 const samsungToken = document.querySelector("#samsungToken");
 const syncSamsungBtn = document.querySelector("#syncSamsungBtn");
+const autoSyncToggleBtn = document.querySelector("#autoSyncToggleBtn");
+const syncInterval = document.querySelector("#syncInterval");
+const lastSyncTime = document.querySelector("#lastSyncTime");
 const syncStatus = document.querySelector("#syncStatus");
 
 let trades = loadTrades();
 let usdKrwRate = toNumber(localStorage.getItem("usdKrwRate")) || 1;
 let usdKrwDate = localStorage.getItem("usdKrwDate") || "";
+let autoSyncTimer = null;
+let isAutoSyncEnabled = localStorage.getItem("samsungAutoSyncEnabled") === "true";
 
 function loadTrades() {
   const saved = localStorage.getItem(storageKey);
@@ -465,34 +470,78 @@ function toggleExchangeChart() {
   }
 }
 
-function normalizeSamsungHolding(holding) {
+function normalizeSamsungTrade(item) {
+  const market = item.market || item.Market || "KR";
+  const buyDate = item.buyDate || item.purchaseDate || item.tradeDate || item.date || item["Buy Date"] || new Date().toISOString().slice(0, 10);
+  const sellDate = item.sellDate || item.closedDate || item["Sell Date"] || "";
+  const sellPrice = item.sellPrice || item.closePrice || item["Sell Price"] || "";
+
   return calculateTrade({
-    "Buy Date": holding.buyDate || holding.purchaseDate || new Date().toISOString().slice(0, 10),
-    "Ticker": holding.ticker || holding.symbol || holding.code || "",
-    "Market": holding.market || "KR",
-    "Side": "매수",
-    "Buy Price": String(holding.buyPrice || holding.averagePrice || holding.avgPrice || ""),
-    "Quantity": String(holding.quantity || holding.qty || ""),
-    "Fee": String(holding.fee || "0"),
-    "Exchange Rate": String(getExchangeRateForMarket(holding.market || "KR", usdKrwRate)),
-    "Current Price": String(holding.currentPrice || holding.price || ""),
-    "Sell Date": "",
-    "Sell Price": "",
+    "Buy Date": buyDate,
+    "Ticker": item.ticker || item.symbol || item.code || item.Ticker || "",
+    "Market": market,
+    "Side": item.side || item.Side || (sellDate || sellPrice ? "매도" : "매수"),
+    "Buy Price": String(item.buyPrice || item.averagePrice || item.avgPrice || item.price || item["Buy Price"] || ""),
+    "Quantity": String(item.quantity || item.qty || item.shares || item.Quantity || ""),
+    "Fee": String(item.fee || item.Fee || "0"),
+    "Exchange Rate": String(getExchangeRateForMarket(market, item.exchangeRate || item["Exchange Rate"] || usdKrwRate)),
+    "Current Price": String(item.currentPrice || item.marketPrice || item.CurrentPrice || item["Current Price"] || ""),
+    "Sell Date": sellDate,
+    "Sell Price": String(sellPrice),
     "Net Profit": "",
     "Return %": ""
   });
 }
 
-async function syncSamsungAccount() {
+function getTradeKey(trade) {
+  return [
+    trade.Ticker,
+    trade.Market,
+    trade["Buy Date"],
+    trade["Sell Date"],
+    trade["Buy Price"],
+    trade["Sell Price"],
+    trade.Quantity
+  ].join("|");
+}
+
+function mergeSyncedTrades(incoming) {
+  const merged = new Map(trades.map((trade) => [getTradeKey(trade), trade]));
+  incoming.forEach((trade) => {
+    merged.set(getTradeKey(trade), trade);
+  });
+  trades = Array.from(merged.values()).sort((a, b) => {
+    const aDate = a["Sell Date"] || a["Buy Date"];
+    const bDate = b["Sell Date"] || b["Buy Date"];
+    return bDate.localeCompare(aDate);
+  });
+}
+
+function getSyncPayload(payload) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (Array.isArray(payload.trades)) {
+    return payload.trades;
+  }
+  if (Array.isArray(payload.holdings)) {
+    return payload.holdings;
+  }
+  return [];
+}
+
+async function syncSamsungAccount({ automatic = false } = {}) {
   const endpoint = samsungEndpoint.value.trim();
   const token = samsungToken.value.trim();
 
   if (!endpoint) {
     syncStatus.textContent = "연동 API 주소를 입력해주세요.";
+    stopAutoSync();
     return;
   }
 
-  syncStatus.textContent = "삼성증권 계좌 데이터를 불러오는 중입니다.";
+  await fetchUsdKrwRate();
+  syncStatus.textContent = automatic ? "자동 동기화 중입니다." : "삼성증권 계좌 데이터를 불러오는 중입니다.";
   syncSamsungBtn.disabled = true;
 
   try {
@@ -505,21 +554,61 @@ async function syncSamsungAccount() {
     }
 
     const payload = await response.json();
-    const holdings = Array.isArray(payload) ? payload : payload.holdings;
-    if (!Array.isArray(holdings)) {
-      throw new Error("holdings 배열을 찾을 수 없습니다.");
+    const syncedItems = getSyncPayload(payload);
+    if (!syncedItems.length) {
+      throw new Error("trades 또는 holdings 배열을 찾을 수 없습니다.");
     }
 
-    const imported = holdings.map(normalizeSamsungHolding);
-    trades = [...imported, ...trades];
+    const imported = syncedItems.map(normalizeSamsungTrade);
+    mergeSyncedTrades(imported);
     saveTrades();
     render();
-    syncStatus.textContent = `${imported.length}개 보유 종목을 가져왔습니다.`;
+    const now = new Date().toLocaleString("ko-KR");
+    localStorage.setItem("samsungLastSyncTime", now);
+    lastSyncTime.value = now;
+    syncStatus.textContent = `${imported.length}개 매매/보유 항목을 동기화했습니다.`;
   } catch (error) {
     syncStatus.textContent = `연동 실패: ${error.message}`;
   } finally {
-    samsungToken.value = "";
     syncSamsungBtn.disabled = false;
+  }
+}
+
+function updateAutoSyncUi() {
+  autoSyncToggleBtn.textContent = isAutoSyncEnabled ? "자동 동기화 중지" : "자동 동기화 시작";
+  syncInterval.disabled = isAutoSyncEnabled;
+}
+
+function startAutoSync() {
+  stopAutoSync({ preserveState: true });
+  isAutoSyncEnabled = true;
+  localStorage.setItem("samsungAutoSyncEnabled", "true");
+  localStorage.setItem("samsungSyncInterval", syncInterval.value);
+  updateAutoSyncUi();
+  syncSamsungAccount({ automatic: true });
+  autoSyncTimer = window.setInterval(() => {
+    syncSamsungAccount({ automatic: true });
+  }, Number(syncInterval.value));
+}
+
+function stopAutoSync({ preserveState = false } = {}) {
+  if (autoSyncTimer) {
+    window.clearInterval(autoSyncTimer);
+    autoSyncTimer = null;
+  }
+  if (!preserveState) {
+    isAutoSyncEnabled = false;
+    localStorage.setItem("samsungAutoSyncEnabled", "false");
+  }
+  updateAutoSyncUi();
+}
+
+function toggleAutoSync() {
+  if (isAutoSyncEnabled) {
+    stopAutoSync();
+    syncStatus.textContent = "자동 동기화를 중지했습니다.";
+  } else {
+    startAutoSync();
   }
 }
 
@@ -646,7 +735,11 @@ exchangeRateCard.addEventListener("keydown", (event) => {
     toggleExchangeChart();
   }
 });
-syncSamsungBtn.addEventListener("click", syncSamsungAccount);
+syncSamsungBtn.addEventListener("click", () => syncSamsungAccount());
+autoSyncToggleBtn.addEventListener("click", toggleAutoSync);
+syncInterval.addEventListener("change", () => {
+  localStorage.setItem("samsungSyncInterval", syncInterval.value);
+});
 
 document.querySelector("#csvInput").addEventListener("change", async (event) => {
   const file = event.target.files[0];
@@ -672,6 +765,12 @@ document.querySelector("#clearBtn").addEventListener("click", () => {
 document.querySelector("#resetFormBtn").addEventListener("click", resetForm);
 
 updateExchangeRateControls();
+syncInterval.value = localStorage.getItem("samsungSyncInterval") || "300000";
+lastSyncTime.value = localStorage.getItem("samsungLastSyncTime") || "아직 없음";
+updateAutoSyncUi();
 resetForm();
 render();
 fetchUsdKrwRate();
+if (isAutoSyncEnabled) {
+  startAutoSync();
+}

@@ -192,6 +192,13 @@ button:hover,
   gap: 12px;
 }
 
+.sync-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .panel {
   padding: 18px;
 }
@@ -351,6 +358,14 @@ td span {
   .panel-head {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .sync-actions {
+    justify-content: stretch;
+  }
+
+  .sync-actions button {
+    width: 100%;
   }
 
   .chart-controls {

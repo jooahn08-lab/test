@@ -95,16 +95,31 @@
       <section class="panel integration-panel">
         <div class="panel-head">
           <div>
-            <h2>삼성증권 계좌 연동</h2>
-            <p class="form-note">공식 API 또는 오픈뱅킹/마이데이터 제휴 백엔드가 있을 때 연결합니다.</p>
+            <h2>삼성증권 계좌 자동 연동</h2>
+            <p class="form-note">공식 API, 오픈뱅킹, 마이데이터, 또는 직접 만든 백엔드가 매매내역 JSON을 내려주면 자동 반영합니다.</p>
           </div>
-          <button id="syncSamsungBtn" type="button">계좌 불러오기</button>
+          <div class="sync-actions">
+            <button id="syncSamsungBtn" type="button">지금 동기화</button>
+            <button id="autoSyncToggleBtn" type="button" class="ghost">자동 동기화 시작</button>
+          </div>
         </div>
         <div class="integration-grid">
-          <label>연동 API 주소<input id="samsungEndpoint" type="url" placeholder="https://your-server.example.com/samsung/holdings"></label>
+          <label>연동 API 주소<input id="samsungEndpoint" type="url" placeholder="https://your-server.example.com/samsung/trades"></label>
           <label>접근 토큰<input id="samsungToken" type="password" placeholder="브라우저에 저장하지 않습니다"></label>
+          <label>업데이트 주기
+            <select id="syncInterval">
+              <option value="60000">1분</option>
+              <option value="300000">5분</option>
+              <option value="1800000">30분</option>
+              <option value="3600000">1시간</option>
+              <option value="21600000">6시간</option>
+              <option value="86400000">하루</option>
+              <option value="604800000">일주일</option>
+            </select>
+          </label>
+          <label>마지막 동기화<input id="lastSyncTime" type="text" value="아직 없음" readonly></label>
         </div>
-        <p id="syncStatus" class="form-note">응답 형식: holdings 배열 안에 ticker, market, buyPrice, quantity, currentPrice, fee 값을 넣어주세요.</p>
+        <p id="syncStatus" class="form-note">응답 형식: trades 또는 holdings 배열 안에 ticker, market, buyDate, buyPrice, quantity, currentPrice, sellDate, sellPrice, fee 값을 넣어주세요.</p>
       </section>
 
       <section class="board-grid">
