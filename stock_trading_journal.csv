@@ -1,0 +1,2 @@
+Date,Ticker,Market,Side,Strategy,Entry Price,Exit Price,Shares,Fees,Realized P/L,Return %,Risk Amount,Stop Loss,Target Price,R Multiple,Reason For Entry,Reason For Exit,Emotion,Lesson,Screenshot/Link
+2026-05-21,AAPL,US,Buy,Breakout,190.00,195.00,10,1.00,49.00,2.58,100.00,180.00,200.00,0.49,"Example: broke above resistance with volume","Example: took profit near target",Calm,"Example: waited for confirmation",""

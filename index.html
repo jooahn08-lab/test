@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>주식 매매일지</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Trading Journal</p>
+        <h1>주식 매매일지</h1>
+      </div>
+      <div class="toolbar">
+        <label class="file-button">
+          CSV 가져오기
+          <input id="csvInput" type="file" accept=".csv,text/csv">
+        </label>
+        <button id="exportBtn" type="button">CSV 내보내기</button>
+        <button id="clearBtn" type="button" class="ghost">초기화</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="summary-grid" aria-label="요약">
+        <article>
+          <span>총 거래</span>
+          <strong id="totalTrades">0</strong>
+        </article>
+        <article>
+          <span>총 손익</span>
+          <strong id="totalPnl">0</strong>
+        </article>
+        <article>
+          <span>승률</span>
+          <strong id="winRate">0%</strong>
+        </article>
+        <article>
+          <span>평균 R</span>
+          <strong id="avgR">0.00</strong>
+        </article>
+      </section>
+
+      <section class="workbench">
+        <form id="tradeForm" class="panel">
+          <div class="panel-head">
+            <h2>거래 입력</h2>
+            <button id="resetFormBtn" type="button" class="ghost">새 입력</button>
+          </div>
+          <input id="editIndex" type="hidden">
+          <div class="form-grid">
+            <label>날짜<input name="Date" type="date" required></label>
+            <label>종목<input name="Ticker" type="text" placeholder="AAPL, 005930" required></label>
+            <label>시장<input name="Market" type="text" placeholder="US, KR"></label>
+            <label>구분
+              <select name="Side">
+                <option>Buy</option>
+                <option>Sell</option>
+                <option>Short</option>
+                <option>Cover</option>
+              </select>
+            </label>
+            <label>전략<input name="Strategy" type="text" placeholder="Breakout"></label>
+            <label>진입가<input name="Entry Price" type="number" step="0.01"></label>
+            <label>청산가<input name="Exit Price" type="number" step="0.01"></label>
+            <label>수량<input name="Shares" type="number" step="1"></label>
+            <label>수수료<input name="Fees" type="number" step="0.01"></label>
+            <label>리스크 금액<input name="Risk Amount" type="number" step="0.01"></label>
+            <label>손절가<input name="Stop Loss" type="number" step="0.01"></label>
+            <label>목표가<input name="Target Price" type="number" step="0.01"></label>
+            <label>감정<input name="Emotion" type="text" placeholder="Calm, Fearful"></label>
+            <label>스크린샷/링크<input name="Screenshot/Link" type="url" placeholder="https://"></label>
+          </div>
+          <label>진입 이유<textarea name="Reason For Entry" rows="3"></textarea></label>
+          <label>청산 이유<textarea name="Reason For Exit" rows="3"></textarea></label>
+          <label>교훈<textarea name="Lesson" rows="3"></textarea></label>
+          <button type="submit" class="primary">저장</button>
+        </form>
+
+        <section class="panel table-panel">
+          <div class="panel-head">
+            <h2>거래 목록</h2>
+            <input id="searchInput" type="search" placeholder="종목, 전략, 감정 검색">
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>날짜</th>
+                  <th>종목</th>
+                  <th>구분</th>
+                  <th>전략</th>
+                  <th>손익</th>
+                  <th>수익률</th>
+                  <th>R</th>
+                  <th>관리</th>
+                </tr>
+              </thead>
+              <tbody id="tradeRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <template id="emptyTemplate">
+      <tr>
+        <td colspan="8" class="empty">CSV를 가져오거나 첫 거래를 입력하세요.</td>
+      </tr>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
