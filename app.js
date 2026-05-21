@@ -24,8 +24,16 @@ const holdingSearch = document.querySelector("#holdingSearch");
 const closedSearch = document.querySelector("#closedSearch");
 const holdingEmptyTemplate = document.querySelector("#holdingEmptyTemplate");
 const closedEmptyTemplate = document.querySelector("#closedEmptyTemplate");
+const exchangeRateBadge = document.querySelector("#exchangeRateBadge");
+const refreshRateBtn = document.querySelector("#refreshRateBtn");
+const samsungEndpoint = document.querySelector("#samsungEndpoint");
+const samsungToken = document.querySelector("#samsungToken");
+const syncSamsungBtn = document.querySelector("#syncSamsungBtn");
+const syncStatus = document.querySelector("#syncStatus");
 
 let trades = loadTrades();
+let usdKrwRate = toNumber(localStorage.getItem("usdKrwRate")) || 1;
+let usdKrwDate = localStorage.getItem("usdKrwDate") || "";
 
 function loadTrades() {
   const saved = localStorage.getItem(storageKey);
@@ -82,6 +90,18 @@ function toNumber(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
+function needsUsdKrw(market) {
+  return ["US", "USA", "NYSE", "NASDAQ", "AMEX"].includes(String(market).trim().toUpperCase());
+}
+
+function getExchangeRateForMarket(market, exchangeRate) {
+  if (!needsUsdKrw(market)) {
+    return 1;
+  }
+
+  return toNumber(exchangeRate) || usdKrwRate || 1;
+}
+
 function formatNumber(value) {
   return toNumber(value).toLocaleString("ko-KR", {
     maximumFractionDigits: 2
@@ -100,7 +120,7 @@ function calculateTrade(data) {
   const buyPrice = toNumber(data["Buy Price"]);
   const quantity = toNumber(data.Quantity);
   const fee = toNumber(data.Fee);
-  const exchangeRate = toNumber(data["Exchange Rate"]) || 1;
+  const exchangeRate = getExchangeRateForMarket(data.Market, data["Exchange Rate"]);
   const referencePrice = isClosed(data) ? toNumber(data["Sell Price"]) : toNumber(data["Current Price"]);
   const grossProfit = (referencePrice - buyPrice) * quantity * exchangeRate;
   const netProfit = referencePrice && buyPrice && quantity ? grossProfit - fee : 0;
@@ -110,10 +130,49 @@ function calculateTrade(data) {
   return {
     ...data,
     "Fee": data.Fee || "0",
-    "Exchange Rate": data["Exchange Rate"] || "1",
+    "Exchange Rate": String(exchangeRate),
     "Net Profit": netProfit ? netProfit.toFixed(2) : "0.00",
     "Return %": returnPercent ? returnPercent.toFixed(2) : "0.00"
   };
+}
+
+async function fetchUsdKrwRate() {
+  exchangeRateBadge.textContent = "USD/KRW 확인 중";
+  refreshRateBtn.disabled = true;
+
+  try {
+    const response = await fetch("https://api.frankfurter.dev/v2/rate/USD/KRW");
+    if (!response.ok) {
+      throw new Error("환율 API 응답 오류");
+    }
+
+    const data = await response.json();
+    usdKrwRate = toNumber(data.rate);
+    usdKrwDate = data.date || "";
+    localStorage.setItem("usdKrwRate", String(usdKrwRate));
+    localStorage.setItem("usdKrwDate", usdKrwDate);
+    updateExchangeRateControls();
+    recalculateTrades();
+  } catch (error) {
+    exchangeRateBadge.textContent = `USD/KRW ${formatNumber(usdKrwRate)}${usdKrwDate ? ` (${usdKrwDate})` : ""}`;
+    syncStatus.textContent = "환율을 새로 가져오지 못했습니다. 마지막 저장 환율로 계산합니다.";
+  } finally {
+    refreshRateBtn.disabled = false;
+  }
+}
+
+function updateExchangeRateControls() {
+  exchangeRateBadge.textContent = `USD/KRW ${formatNumber(usdKrwRate)}${usdKrwDate ? ` (${usdKrwDate})` : ""}`;
+  form.elements["Exchange Rate"].value = String(usdKrwRate || 1);
+}
+
+function recalculateTrades() {
+  trades = trades.map((trade) => calculateTrade({
+    ...trade,
+    "Exchange Rate": getExchangeRateForMarket(trade.Market, usdKrwRate)
+  }));
+  saveTrades();
+  render();
 }
 
 function render() {
@@ -190,7 +249,7 @@ function resetForm() {
   editIndex.value = "";
   form.elements["Buy Date"].valueAsDate = new Date();
   form.elements["Fee"].value = "0";
-  form.elements["Exchange Rate"].value = "1";
+  form.elements["Exchange Rate"].value = String(usdKrwRate || 1);
 }
 
 function fillForm(index) {
@@ -209,7 +268,66 @@ function serializeForm() {
   headers.forEach((header) => {
     data[header] = form.elements[header] ? form.elements[header].value.trim() : "";
   });
+  data["Exchange Rate"] = String(getExchangeRateForMarket(data.Market, usdKrwRate));
   return calculateTrade(data);
+}
+
+function normalizeSamsungHolding(holding) {
+  return calculateTrade({
+    "Buy Date": holding.buyDate || holding.purchaseDate || new Date().toISOString().slice(0, 10),
+    "Ticker": holding.ticker || holding.symbol || holding.code || "",
+    "Market": holding.market || "KR",
+    "Side": "매수",
+    "Buy Price": String(holding.buyPrice || holding.averagePrice || holding.avgPrice || ""),
+    "Quantity": String(holding.quantity || holding.qty || ""),
+    "Fee": String(holding.fee || "0"),
+    "Exchange Rate": String(getExchangeRateForMarket(holding.market || "KR", usdKrwRate)),
+    "Current Price": String(holding.currentPrice || holding.price || ""),
+    "Sell Date": "",
+    "Sell Price": "",
+    "Net Profit": "",
+    "Return %": ""
+  });
+}
+
+async function syncSamsungAccount() {
+  const endpoint = samsungEndpoint.value.trim();
+  const token = samsungToken.value.trim();
+
+  if (!endpoint) {
+    syncStatus.textContent = "연동 API 주소를 입력해주세요.";
+    return;
+  }
+
+  syncStatus.textContent = "삼성증권 계좌 데이터를 불러오는 중입니다.";
+  syncSamsungBtn.disabled = true;
+
+  try {
+    const response = await fetch(endpoint, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+
+    if (!response.ok) {
+      throw new Error("계좌 연동 API 응답 오류");
+    }
+
+    const payload = await response.json();
+    const holdings = Array.isArray(payload) ? payload : payload.holdings;
+    if (!Array.isArray(holdings)) {
+      throw new Error("holdings 배열을 찾을 수 없습니다.");
+    }
+
+    const imported = holdings.map(normalizeSamsungHolding);
+    trades = [...imported, ...trades];
+    saveTrades();
+    render();
+    syncStatus.textContent = `${imported.length}개 보유 종목을 가져왔습니다.`;
+  } catch (error) {
+    syncStatus.textContent = `연동 실패: ${error.message}`;
+  } finally {
+    samsungToken.value = "";
+    syncSamsungBtn.disabled = false;
+  }
 }
 
 function parseCsv(text) {
@@ -348,6 +466,10 @@ document.querySelector("#clearBtn").addEventListener("click", () => {
   }
 });
 document.querySelector("#resetFormBtn").addEventListener("click", resetForm);
+refreshRateBtn.addEventListener("click", fetchUsdKrwRate);
+syncSamsungBtn.addEventListener("click", syncSamsungAccount);
 
+updateExchangeRateControls();
 resetForm();
 render();
+fetchUsdKrwRate();

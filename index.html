@@ -13,6 +13,8 @@
         <h1>주식 매매일지</h1>
       </div>
       <div class="toolbar">
+        <span id="exchangeRateBadge" class="rate-badge">USD/KRW 확인 중</span>
+        <button id="refreshRateBtn" type="button" class="ghost">환율 새로고침</button>
         <label class="file-button">
           CSV 가져오기
           <input id="csvInput" type="file" accept=".csv,text/csv">
@@ -62,14 +64,29 @@
             <label>매매단가<input name="Buy Price" type="number" step="0.01" required></label>
             <label>수량<input name="Quantity" type="number" step="1" min="0" required></label>
             <label>수수료<input name="Fee" type="number" step="0.01" min="0" value="0"></label>
-            <label>환율<input name="Exchange Rate" type="number" step="0.0001" min="0" value="1"></label>
+            <input name="Exchange Rate" type="hidden" value="1">
             <label>현재가<input name="Current Price" type="number" step="0.01" min="0"></label>
             <label>판매날짜<input name="Sell Date" type="date"></label>
             <label>판매가격<input name="Sell Price" type="number" step="0.01" min="0"></label>
           </div>
-          <p class="form-note">판매날짜와 판매가격을 입력하면 매매 완료로, 비워두면 보유 중으로 표시됩니다.</p>
+          <p class="form-note">미국 시장은 인터넷에서 가져온 USD/KRW 환율을 자동 적용합니다. 한국 시장은 환율 1로 계산됩니다.</p>
           <button type="submit" class="primary">저장</button>
         </form>
+      </section>
+
+      <section class="panel integration-panel">
+        <div class="panel-head">
+          <div>
+            <h2>삼성증권 계좌 연동</h2>
+            <p class="form-note">공식 API 또는 오픈뱅킹/마이데이터 제휴 백엔드가 있을 때 연결합니다.</p>
+          </div>
+          <button id="syncSamsungBtn" type="button">계좌 불러오기</button>
+        </div>
+        <div class="integration-grid">
+          <label>연동 API 주소<input id="samsungEndpoint" type="url" placeholder="https://your-server.example.com/samsung/holdings"></label>
+          <label>접근 토큰<input id="samsungToken" type="password" placeholder="브라우저에 저장하지 않습니다"></label>
+        </div>
+        <p id="syncStatus" class="form-note">응답 형식: holdings 배열 안에 ticker, market, buyPrice, quantity, currentPrice, fee 값을 넣어주세요.</p>
       </section>
 
       <section class="board-grid">

@@ -60,9 +60,23 @@ h2 {
 }
 
 .toolbar {
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.rate-badge {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f7faf8;
+  color: var(--ink);
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 button,
@@ -133,6 +147,16 @@ button:hover,
 
 .entry-layout {
   margin-bottom: 18px;
+}
+
+.integration-panel {
+  margin-bottom: 18px;
+}
+
+.integration-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(240px, 1fr);
+  gap: 12px;
 }
 
 .panel {
@@ -272,6 +296,7 @@ td span {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .integration-grid,
   .form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -285,6 +310,7 @@ td span {
   }
 
   .summary-grid,
+  .integration-grid,
   .form-grid {
     grid-template-columns: 1fr;
   }
